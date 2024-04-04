@@ -3,15 +3,18 @@ package main
 import (
 	"fmt"
 	"net"
+	// Uncomment this block to pass the first stage
+	// "net"
+	// "os"
 )
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here !")
+	fmt.Println("Logs from your program will appear here!")
 
 	// Uncomment this block to pass the first stage
 	//
-	listener, err := net.Listen("tcp", "localhost:6379")
+	listener, err := net.Listen("tcp", "localhost:3000")
 	if err != nil {
 		fmt.Printf("Error = %s", err)
 	}
@@ -22,25 +25,14 @@ func main() {
 		fmt.Printf("Error = %s", err)
 	}
 
+	defer conn.Close()
 	response := []byte("+PONG\r\n")
-	for {
 
-		buff := make([]byte, 1024)
-
-		_, err := conn.Read(buff)
-		if err != nil {
-			fmt.Printf("Error Reading the Request : %v", err)
-			break
-		}
-
-		_, err = conn.Write(response)
-		if err != nil {
-			fmt.Printf("Error = %s", err)
-			break
-		}
-
+	n, err := conn.Write(response)
+	if err != nil {
+		fmt.Printf("Error = %s", err)
 	}
 
-	conn.Close()
+	fmt.Printf("n = %d", n)
 
 }
