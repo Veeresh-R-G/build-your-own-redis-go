@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net"
 	// Uncomment this block to pass the first stage
 	// "net"
 	// "os"
@@ -13,14 +14,25 @@ func main() {
 
 	// Uncomment this block to pass the first stage
 	//
-	// l, err := net.Listen("tcp", "0.0.0.0:6379")
-	// if err != nil {
-	// 	fmt.Println("Failed to bind to port 6379")
-	// 	os.Exit(1)
-	// }
-	// _, err = l.Accept()
-	// if err != nil {
-	// 	fmt.Println("Error accepting connection: ", err.Error())
-	// 	os.Exit(1)
-	// }
+	listener, err := net.Listen("tcp", "localhost:3000")
+	if err != nil {
+		fmt.Printf("Error = %s", err)
+	}
+	defer listener.Close()
+
+	conn, err := listener.Accept()
+	if err != nil {
+		fmt.Printf("Error = %s", err)
+	}
+
+	defer conn.Close()
+	response := []byte("+PONG\r\n")
+
+	n, err := conn.Write(response)
+	if err != nil {
+		fmt.Printf("Error = %s", err)
+	}
+
+	fmt.Printf("n = %d", n)
+
 }
