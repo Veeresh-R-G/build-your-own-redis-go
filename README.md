@@ -15,3 +15,7 @@
 
 1. Handled 2 concurrent requests and responded with resp(+PONG/r/n)
 2. Implemented with the help of go-routines 🙃
+
+### Stage 5
+
+1. Handled concurrent requests and responded with custom message

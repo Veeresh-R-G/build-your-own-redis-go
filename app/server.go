@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 func Dispatcher(conn net.Conn) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
+
 	response := []byte("+PONG\r\n")
+
 	for {
 
 		n, err := conn.Read(buff)
@@ -16,7 +19,12 @@ func Dispatcher(conn net.Conn) {
 			fmt.Printf("Error Reading the Request : %v\n", err)
 			break
 		}
-		fmt.Printf("Buffer = %v\n", buff[:n])
+
+		tokens := strings.Split(string(buff[:n]), "\r\n")
+		if len(tokens) > 4 {
+			response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(tokens[4]), tokens[4]))
+		}
+
 		_, err = conn.Write(response)
 		if err != nil {
 			fmt.Printf("Error in writing response : %v\n", err)
@@ -42,6 +50,7 @@ func main() {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Printf("Error in creating conn object %s\n", err)
+			break
 		}
 
 		go Dispatcher(conn)
