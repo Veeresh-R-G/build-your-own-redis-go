@@ -11,7 +11,7 @@ func Dispatcher(conn net.Conn) {
 	buff := make([]byte, 1024)
 
 	response := []byte("+PONG\r\n")
-
+	mp := make(map[string]string)
 	for {
 
 		n, err := conn.Read(buff)
@@ -21,8 +21,23 @@ func Dispatcher(conn net.Conn) {
 		}
 
 		tokens := strings.Split(string(buff[:n]), "\r\n")
-		if len(tokens) > 4 {
+		fmt.Println(tokens)
+		cmd := tokens[2]
+
+		if cmd == "echo" {
 			response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(tokens[4]), tokens[4]))
+		} else if cmd == "set" {
+			response = []byte("+OK\r\n")
+			mp[tokens[4]] = tokens[6]
+			fmt.Println(mp)
+		} else if cmd == "get" {
+			//get
+			fmt.Printf("GET ==> %s\n", tokens[4])
+			if val, ok := mp[tokens[4]]; !ok {
+				response = []byte("$-1\r\n")
+			} else {
+				response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
+			}
 		}
 
 		_, err = conn.Write(response)
@@ -30,6 +45,7 @@ func Dispatcher(conn net.Conn) {
 			fmt.Printf("Error in writing response : %v\n", err)
 			break
 		}
+
 	}
 
 }
