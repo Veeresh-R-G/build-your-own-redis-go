@@ -19,3 +19,7 @@
 ### Stage 5
 
 1. Handled concurrent requests and responded with custom message
+
+### Stage 6
+
+1. Implemented GET / SET in RDB
