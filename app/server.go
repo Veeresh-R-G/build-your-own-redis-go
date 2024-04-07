@@ -2,13 +2,19 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 )
 
 func Dispatcher(conn net.Conn) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
+
+	EntryTime := make(map[string]time.Time)
+	ExpriryTime := make(map[string]int)
 
 	response := []byte("+PONG\r\n")
 	mp := make(map[string]string)
@@ -21,23 +27,60 @@ func Dispatcher(conn net.Conn) {
 		}
 
 		tokens := strings.Split(string(buff[:n]), "\r\n")
+		tokens = tokens[:len(tokens)-1]
 		fmt.Println(tokens)
 		cmd := tokens[2]
 
 		if cmd == "echo" {
+			fmt.Println("ECHO ===")
 			response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(tokens[4]), tokens[4]))
 		} else if cmd == "set" {
+			key := tokens[4]
+			value := tokens[6]
+			fmt.Printf("SET ==> %s\n", tokens[4])
+
+			if len(tokens) > 7 {
+				//px command
+				EntryTime[key] = time.Now()
+				time_duration := tokens[10]
+				num, err := strconv.Atoi(time_duration)
+				if err != nil {
+					log.Fatalln("Error While converting to a number")
+				}
+				ExpriryTime[key] = num
+			}
 			response = []byte("+OK\r\n")
-			mp[tokens[4]] = tokens[6]
+			mp[key] = value
+
 			fmt.Println(mp)
 		} else if cmd == "get" {
 			//get
+			key := tokens[4]
 			fmt.Printf("GET ==> %s\n", tokens[4])
-			if val, ok := mp[tokens[4]]; !ok {
-				response = []byte("$-1\r\n")
+			if val, ok := ExpriryTime[key]; ok {
+
+				if time.Since(EntryTime[key]).Milliseconds() >= int64(val) {
+					//Deadline is reached
+					fmt.Println(" ---- TimeOUT ---- ")
+					delete(EntryTime, key)
+					delete(ExpriryTime, key)
+					response = []byte("$-1\r\n")
+				} else {
+					fmt.Println(" ---- Not expired Key ---- ")
+					if val, ok := mp[tokens[4]]; !ok {
+						response = []byte("$-1\r\n")
+					} else {
+						response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
+					}
+				}
 			} else {
-				response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
+				if val, ok := mp[tokens[4]]; !ok {
+					response = []byte("$-1\r\n")
+				} else {
+					response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
+				}
 			}
+
 		}
 
 		_, err = conn.Write(response)
