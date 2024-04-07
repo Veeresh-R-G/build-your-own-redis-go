@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -96,9 +97,15 @@ func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here !")
 
-	// Uncomment this block to pass the first stage
-	//
-	listener, err := net.Listen("tcp", "localhost:6379")
+	args := os.Args
+	fmt.Println(args)
+	port := "6379"
+
+	if len(args) > 1 && args[1] == "--port" {
+		port = args[2]
+	}
+
+	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
 	if err != nil {
 		fmt.Printf("Error in initiating tcp connection = %s\n", err)
 	}

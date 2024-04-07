@@ -1,3 +1,5 @@
+## Basic ReDis Setup
+
 ### Stage 1
 
 1. It was just uncommenting some code that was already there.
@@ -29,3 +31,9 @@
 1. Implemented GET / SET with px timeout command
 
 > :rocket: Done with all the basic implementation of RDB
+
+## Replication Setup for Redis
+
+### Stage - 1
+
+1. Run the redis server on custom port specified using the --port flag
