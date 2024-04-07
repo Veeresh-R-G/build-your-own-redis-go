@@ -41,3 +41,7 @@
 ### Stage - 2
 
 1. Added support for INFO REPLICATION COMMAND
+
+### Stage - 3 / 4
+
+1. Added support to return the Master Node ID and Offset

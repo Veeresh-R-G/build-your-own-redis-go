@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func Dispatcher(conn net.Conn) {
+func Dispatcher(conn net.Conn, master bool) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
 
@@ -83,7 +83,16 @@ func Dispatcher(conn net.Conn) {
 			}
 
 		} else if cmd == "info" && strings.ToLower(tokens[4]) == "replication" {
-			response = []byte("$11\r\nrole:master\r\n")
+			fmt.Println("Here in master - 1")
+			if master {
+				fmt.Println("Here in master")
+
+				temp := fmt.Sprintf("$%d\r\n%s\r\n", 87, "role:master\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0")
+
+				response = []byte(temp)
+			} else {
+				response = []byte("$10\r\nrole:slave\r\n")
+			}
 		}
 
 		_, err = conn.Write(response)
@@ -103,8 +112,13 @@ func main() {
 	fmt.Println(args)
 	port := "6379"
 
-	if len(args) > 1 && args[1] == "--port" {
+	if len(args) > 1 && (args[1] == "--port" || args[1] == "-p") {
 		port = args[2]
+	}
+
+	master := true
+	if len(args) > 3 && args[3] == "--replicaof" {
+		master = false
 	}
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
 	if err != nil {
@@ -120,7 +134,7 @@ func main() {
 			break
 		}
 
-		go Dispatcher(conn)
+		go Dispatcher(conn, master)
 	}
 
 }
