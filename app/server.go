@@ -30,7 +30,7 @@ func Dispatcher(conn net.Conn) {
 		tokens := strings.Split(string(buff[:n]), "\r\n")
 		tokens = tokens[:len(tokens)-1]
 		fmt.Println(tokens)
-		cmd := tokens[2]
+		cmd := strings.ToLower(tokens[2])
 
 		if cmd == "echo" {
 			fmt.Println("ECHO ===")
@@ -82,6 +82,8 @@ func Dispatcher(conn net.Conn) {
 				}
 			}
 
+		} else if cmd == "info" && strings.ToLower(tokens[4]) == "replication" {
+			response = []byte("$11\r\nrole:master\r\n")
 		}
 
 		_, err = conn.Write(response)
@@ -104,7 +106,6 @@ func main() {
 	if len(args) > 1 && args[1] == "--port" {
 		port = args[2]
 	}
-
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
 	if err != nil {
 		fmt.Printf("Error in initiating tcp connection = %s\n", err)

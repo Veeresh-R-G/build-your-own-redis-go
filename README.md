@@ -37,3 +37,7 @@
 ### Stage - 1
 
 1. Run the redis server on custom port specified using the --port flag
+
+### Stage - 2
+
+1. Added support for INFO REPLICATION COMMAND
