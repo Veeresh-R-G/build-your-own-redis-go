@@ -107,7 +107,6 @@ func Dispatcher(conn net.Conn, master bool) {
 			fmt.Printf("Error in writing response : %v\n", err)
 			break
 		}
-
 	}
 }
 
@@ -138,11 +137,30 @@ func sendPing(masterAddr, masterPort string) {
 		log.Fatalln("Second Message not sent : ", err)
 	}
 
-	if _, err = conn.Read(buff); err != nil {
+	n, err := conn.Read(buff)
+	if err != nil {
 		log.Fatalln("Not receiving response from master node")
 		os.Exit(1)
 	}
+	fmt.Printf("Ack - 2 from Master Node : %s", string(buff[:n]))
 
+	n, err = conn.Read(buff)
+	if err != nil {
+		log.Fatalln("Not receiving ack for the final message from master node")
+		os.Exit(1)
+	}
+	fmt.Printf("Ack - 3 from Master Node : %s", string(buff[:n]))
+
+	if _, err := conn.Write([]byte("*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n")); err != nil {
+		log.Fatalln("Error writing PSYNC : ", err)
+		os.Exit(1)
+	}
+
+	_, err = conn.Read(buff)
+	if err != nil {
+		log.Fatalln("Error while reading FULLRESYNC", err)
+		os.Exit(1)
+	}
 }
 
 func main() {
@@ -179,5 +197,4 @@ func main() {
 		fmt.Println("Here I am")
 		go Dispatcher(conn, master)
 	}
-
 }
