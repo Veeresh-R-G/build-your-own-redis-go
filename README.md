@@ -47,5 +47,9 @@
 > :rocket: SEND Handshake done
 
 ### Stage - 8 Receive Handshake - 1 / 2
-1. Relayed back message acting as a master node.
+1. Relayed back message acting as a master node. (for REPLCONF)
+
+### Stage - 9 Receive Handshake - 2 / 2
+1. Relayed back message for PSYNC. Relayed FULLSYNC which tells the worker node that master is unable to perform incremental synchronization so it will perform full synchronization with the worker.
+> :rocket: Receive Handshake done
 
