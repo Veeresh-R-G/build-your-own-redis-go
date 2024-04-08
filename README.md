@@ -38,3 +38,6 @@
 ### Stage - 5 Handshake - 1 / 3
 1. Pinged the Master node :)
 2. I'm yet to Refactor the code
+
+### Stage - 6 Handshake - 2 / 3
+1. Received and pinged master twice again :)

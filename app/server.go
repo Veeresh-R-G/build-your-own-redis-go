@@ -113,14 +113,36 @@ func Dispatcher(conn net.Conn, master bool) {
 
 func sendPing(masterAddr, masterPort string) {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", masterAddr, masterPort))
+
 	if err != nil {
 		fmt.Printf("Error while creating connection object %v\n", err)
 	}
+
 	defer conn.Close()
+	buff := make([]byte, 1024)
+
 	if _, err := conn.Write([]byte("*1\r\n$4\r\nping\r\n")); err != nil {
 		log.Println("Error sending PING command to", masterAddr, ":", err)
 		return
 	}
+	if _, err = conn.Read(buff); err != nil {
+		log.Fatalln("Not receiving response from master node")
+	}
+
+	if _, err = conn.Write([]byte("*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n")); err != nil {
+		log.Fatalln("First Message not sent : ", err)
+		return
+	}
+
+	if _, err = conn.Write([]byte("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n")); err != nil {
+		log.Fatalln("Second Message not sent : ", err)
+	}
+
+	if _, err = conn.Read(buff); err != nil {
+		log.Fatalln("Not receiving response from master node")
+		os.Exit(1)
+	}
+
 }
 
 func main() {
