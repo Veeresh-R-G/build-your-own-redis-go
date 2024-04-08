@@ -16,6 +16,12 @@ type Redis struct {
 	store       map[string]string
 }
 
+type MasterNode struct {
+	masterId   string
+	masterPort string
+	IsActive   bool
+}
+
 func Dispatcher(conn net.Conn, master bool) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
@@ -102,6 +108,8 @@ func Dispatcher(conn net.Conn, master bool) {
 			}
 		} else if cmd == "replconf" {
 			response = []byte("+OK\r\n")
+		} else if cmd == "psync" {
+			response = []byte("+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n")
 		}
 
 		_, err = conn.Write(response)
@@ -203,4 +211,3 @@ func main() {
 	}
 
 }
-
