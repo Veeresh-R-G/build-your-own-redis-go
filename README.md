@@ -41,3 +41,7 @@
 
 ### Stage - 6 Handshake - 2 / 3
 1. Received and pinged master twice again :)
+
+### Stage - 7 Handshake - 3 / 3
+1. Relayed the PSYNC to master node
+> :rocket: SEND Handshake done 
