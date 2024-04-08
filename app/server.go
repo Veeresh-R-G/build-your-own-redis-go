@@ -100,6 +100,8 @@ func Dispatcher(conn net.Conn, master bool) {
 			} else {
 				response = []byte("$10\r\nrole:slave\r\n")
 			}
+		} else if cmd == "replconf" {
+			response = []byte("+OK\r\n")
 		}
 
 		_, err = conn.Write(response)
@@ -107,6 +109,7 @@ func Dispatcher(conn net.Conn, master bool) {
 			fmt.Printf("Error in writing response : %v\n", err)
 			break
 		}
+
 	}
 }
 
@@ -139,14 +142,14 @@ func sendPing(masterAddr, masterPort string) {
 
 	n, err := conn.Read(buff)
 	if err != nil {
-		log.Fatalln("Not receiving response from master node")
+		log.Fatalln("Not receiving response from master node for REPLCONF ")
 		os.Exit(1)
 	}
 	fmt.Printf("Ack - 2 from Master Node : %s", string(buff[:n]))
 
 	n, err = conn.Read(buff)
 	if err != nil {
-		log.Fatalln("Not receiving ack for the final message from master node")
+		log.Fatalln("Not receiving ack for PSYNC from master node")
 		os.Exit(1)
 	}
 	fmt.Printf("Ack - 3 from Master Node : %s", string(buff[:n]))
@@ -161,6 +164,7 @@ func sendPing(masterAddr, masterPort string) {
 		log.Fatalln("Error while reading FULLRESYNC", err)
 		os.Exit(1)
 	}
+
 }
 
 func main() {
@@ -197,4 +201,6 @@ func main() {
 		fmt.Println("Here I am")
 		go Dispatcher(conn, master)
 	}
+
 }
+
