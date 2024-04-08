@@ -10,15 +10,20 @@ import (
 	"time"
 )
 
+type Redis struct {
+	EntryTime   map[string]time.Time
+	ExpriryTime map[string]int
+	store       map[string]string
+}
+
 func Dispatcher(conn net.Conn, master bool) {
 	defer conn.Close()
 	buff := make([]byte, 1024)
-
 	EntryTime := make(map[string]time.Time)
 	ExpriryTime := make(map[string]int)
 
 	response := []byte("+PONG\r\n")
-	mp := make(map[string]string)
+	store := make(map[string]string)
 	for {
 
 		n, err := conn.Read(buff)
@@ -29,7 +34,9 @@ func Dispatcher(conn net.Conn, master bool) {
 
 		tokens := strings.Split(string(buff[:n]), "\r\n")
 		tokens = tokens[:len(tokens)-1]
+		fmt.Println("-------")
 		fmt.Println(tokens)
+		fmt.Println("-------")
 		cmd := strings.ToLower(tokens[2])
 
 		if cmd == "echo" {
@@ -51,9 +58,9 @@ func Dispatcher(conn net.Conn, master bool) {
 				ExpriryTime[key] = num
 			}
 			response = []byte("+OK\r\n")
-			mp[key] = value
+			store[key] = value
 
-			fmt.Println(mp)
+			fmt.Println(store)
 		} else if cmd == "get" {
 			//get
 			key := tokens[4]
@@ -68,14 +75,14 @@ func Dispatcher(conn net.Conn, master bool) {
 					response = []byte("$-1\r\n")
 				} else {
 					fmt.Println(" ---- Not expired Key ---- ")
-					if val, ok := mp[tokens[4]]; !ok {
+					if val, ok := store[tokens[4]]; !ok {
 						response = []byte("$-1\r\n")
 					} else {
 						response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
 					}
 				}
 			} else {
-				if val, ok := mp[tokens[4]]; !ok {
+				if val, ok := store[tokens[4]]; !ok {
 					response = []byte("$-1\r\n")
 				} else {
 					response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
@@ -83,7 +90,7 @@ func Dispatcher(conn net.Conn, master bool) {
 			}
 
 		} else if cmd == "info" && strings.ToLower(tokens[4]) == "replication" {
-			fmt.Println("Here in master - 1")
+			fmt.Println("INFO =====>")
 			if master {
 				fmt.Println("Here in master")
 
@@ -102,8 +109,20 @@ func Dispatcher(conn net.Conn, master bool) {
 		}
 
 	}
-
 }
+
+func sendPing(masterAddr, masterPort string) {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", masterAddr, masterPort))
+	if err != nil {
+		fmt.Printf("Error while creating connection object %v\n", err)
+	}
+	defer conn.Close()
+	if _, err := conn.Write([]byte("*1\r\n$4\r\nping\r\n")); err != nil {
+		log.Println("Error sending PING command to", masterAddr, ":", err)
+		return
+	}
+}
+
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here !")
@@ -118,6 +137,7 @@ func main() {
 
 	master := true
 	if len(args) > 3 && args[3] == "--replicaof" {
+		sendPing(args[4], args[5])
 		master = false
 	}
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
@@ -130,10 +150,11 @@ func main() {
 
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Printf("Error in creating conn object %s\n", err)
+			fmt.Printf("Error in creating connection object %s\n", err)
 			break
 		}
 
+		fmt.Println("Here I am")
 		go Dispatcher(conn, master)
 	}
 
