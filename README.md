@@ -35,13 +35,17 @@
 ### Stage - 3 / 4
 1. Added support to return the Master Node ID and Offset
 
-### Stage - 5 Handshake - 1 / 3
+### Stage - 5 Send Handshake - 1 / 3
 1. Pinged the Master node :)
 2. I'm yet to Refactor the code
 
-### Stage - 6 Handshake - 2 / 3
+### Stage - 6 Send Handshake - 2 / 3
 1. Received and pinged master twice again :)
 
-### Stage - 7 Handshake - 3 / 3
+### Stage - 7 Send Handshake - 3 / 3
 1. Relayed the PSYNC to master node
-> :rocket: SEND Handshake done 
+> :rocket: SEND Handshake done
+
+### Stage - 8 Receive Handshake - 1 / 2
+1. Relayed back message acting as a master node.
+
