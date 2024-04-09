@@ -68,7 +68,7 @@ func ReplicateSet(key, value string) {
 }
 
 func Dispatcher(conn net.Conn, master bool) {
-	// defer conn.Close()
+
 	buff := make([]byte, 1024)
 	EntryTime := make(map[string]time.Time)
 	ExpriryTime := make(map[string]int)
@@ -274,8 +274,8 @@ func main() {
 			fmt.Printf("Error in creating connection object %s\n", err)
 			break
 		}
+		defer conn.Close()
 
 		go Dispatcher(conn, master)
 	}
-
 }
