@@ -17,6 +17,16 @@ type Redis struct {
 	Store       map[string]string
 }
 
+type ReplicationConfig struct {
+	workers []net.Conn
+}
+
+var (
+	replConf = ReplicationConfig{
+		workers: []net.Conn{},
+	}
+)
+
 type MasterNode struct {
 	MasterId       string
 	MasterPort     string
@@ -25,9 +35,40 @@ type MasterNode struct {
 }
 
 var RDBContent string = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
+var Replicate = false
+
+func toBulkString(value string) []byte {
+	if len(value) == 0 {
+		return []byte("$-1\r\n")
+	}
+	return []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(value), value))
+}
+
+func toSimpleString(value string) []byte {
+	return []byte(fmt.Sprintf("+%s\r\n", value))
+}
+
+func toArray(values []string) []byte {
+	str := ""
+	for _, value := range values {
+		str = fmt.Sprintf("%s%s", str, toBulkString(value))
+	}
+	return []byte(fmt.Sprintf("*%d\r\n%s", len(values), str))
+}
+
+func ReplicateSet(key, value string) {
+	fmt.Printf("Replicating : %v : %v\n", key, value)
+	fmt.Println("worker:", replConf.workers)
+	for _, worker := range replConf.workers {
+		_, err := worker.Write(toArray([]string{"SET", key, value}))
+		if err != nil {
+			log.Fatalf("Error while writing to worker : %v", err)
+		}
+	}
+}
 
 func Dispatcher(conn net.Conn, master bool) {
-	defer conn.Close()
+	// defer conn.Close()
 	buff := make([]byte, 1024)
 	EntryTime := make(map[string]time.Time)
 	ExpriryTime := make(map[string]int)
@@ -69,7 +110,7 @@ func Dispatcher(conn net.Conn, master bool) {
 			}
 			response = []byte("+OK\r\n")
 			store[key] = value
-
+			ReplicateSet(key, value)
 			fmt.Println(store)
 		} else if cmd == "get" {
 			//get
@@ -102,17 +143,16 @@ func Dispatcher(conn net.Conn, master bool) {
 		} else if cmd == "info" && strings.ToLower(tokens[4]) == "replication" {
 			fmt.Println("INFO =====>")
 			if master {
-				fmt.Println("Here in master")
-
 				temp := fmt.Sprintf("$%d\r\n%s\r\n", 87, "role:master\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\nmaster_repl_offset:0")
-
 				response = []byte(temp)
 			} else {
 				response = []byte("$10\r\nrole:slave\r\n")
 			}
 		} else if cmd == "replconf" {
+			fmt.Println("REPLCONF")
 			response = []byte("+OK\r\n")
 		} else if cmd == "psync" {
+			fmt.Println("PSYNC")
 			response = []byte("+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n")
 			_, err = conn.Write(response)
 			if err != nil {
@@ -125,12 +165,18 @@ func Dispatcher(conn net.Conn, master bool) {
 				log.Fatalln("Error while converting: ", err)
 			}
 
+			//So whenever we send a PSYNC to a worker, we append that conn object associated
+			//with that worker in this array so that we know which conn object belongs to which worker
+			//I'm feeling like GOD
+			replConf.workers = append(replConf.workers, conn)
+
 			response = []byte(fmt.Sprintf("$%d\r\n%s", len(decode), decode))
 			_, err = conn.Write(response)
 			if err != nil {
-				fmt.Printf("Error in writing response : %v\n", err)
-				break
+				log.Fatalf("Error in writing response : %v\n", err)
+				return
 			}
+
 			return
 
 		}
@@ -229,7 +275,6 @@ func main() {
 			break
 		}
 
-		fmt.Println("Here I am")
 		go Dispatcher(conn, master)
 	}
 
