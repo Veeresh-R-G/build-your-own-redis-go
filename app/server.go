@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"net"
@@ -13,14 +14,17 @@ import (
 type Redis struct {
 	EntryTime   map[string]time.Time
 	ExpriryTime map[string]int
-	store       map[string]string
+	Store       map[string]string
 }
 
 type MasterNode struct {
-	masterId   string
-	masterPort string
-	IsActive   bool
+	MasterId       string
+	MasterPort     string
+	IsActive       bool
+	RDBFileContent []byte
 }
+
+var RDBContent string = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="
 
 func Dispatcher(conn net.Conn, master bool) {
 	defer conn.Close()
@@ -110,6 +114,25 @@ func Dispatcher(conn net.Conn, master bool) {
 			response = []byte("+OK\r\n")
 		} else if cmd == "psync" {
 			response = []byte("+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n")
+			_, err = conn.Write(response)
+			if err != nil {
+				fmt.Printf("Error in writing response : %v\n", err)
+				break
+			}
+
+			decode, err := base64.StdEncoding.DecodeString(RDBContent)
+			if err != nil {
+				log.Fatalln("Error while converting: ", err)
+			}
+
+			response = []byte(fmt.Sprintf("$%d\r\n%s", len(decode), decode))
+			_, err = conn.Write(response)
+			if err != nil {
+				fmt.Printf("Error in writing response : %v\n", err)
+				break
+			}
+			return
+
 		}
 
 		_, err = conn.Write(response)
