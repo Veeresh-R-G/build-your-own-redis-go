@@ -53,3 +53,6 @@
 1. Relayed back message for PSYNC. Relayed FULLSYNC which tells the worker node that master is unable to perform incremental synchronization so it will perform full synchronization with the worker.
 > :rocket: Receive Handshake done
 
+### Stage - 10 Sending RDB 
+1. Responded with a RDB state file for full synchronization to take place on the worker node
+
