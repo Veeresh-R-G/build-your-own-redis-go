@@ -56,3 +56,7 @@
 ### Stage - 10 Sending RDB 
 1. Responded with a RDB state file for full synchronization to take place on the worker node
 
+### Stage - 11
+1. After sending the RDB to the worker node, we need replicate the commands that the master receives.
+2. Single node replication implemented
+
