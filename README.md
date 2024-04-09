@@ -56,7 +56,16 @@
 ### Stage - 10 Sending RDB 
 1. Responded with a RDB state file for full synchronization to take place on the worker node
 
-### Stage - 11
+### Stage - 11 Single node replication
 1. After sending the RDB to the worker node, we need replicate the commands that the master receives.
 2. Single node replication implemented
+
+### Stage - 12 Multi node replication
+1. Implemented multi-node replication
+2. Forgot to close the connection object in the previous stage, fixed it here.
+> Go is actually so cool, became a bigger fan of go routines
+
+#### Pending tasks
+1. Code Refactoring
+2. Use RW.mutex on global slice storing the worker node's connection object
 
