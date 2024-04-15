@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,18 +20,27 @@ type Redis struct {
 }
 
 type ReplicationConfig struct {
-	workers []net.Conn
+	workerLock sync.Mutex
+	workers    []net.Conn
 }
 
 var (
 	replConf = ReplicationConfig{
-		workers: []net.Conn{},
+		workers:    []net.Conn{},
+		workerLock: sync.Mutex{},
 	}
 )
 
-type MasterNode struct {
+var (
+	store = make(map[string]string)
+)
+
+type InstanceConfig struct {
 	MasterId       string
 	MasterPort     string
+	ReplicaOf      string
+	port           int
+	IsSlave        bool
 	IsActive       bool
 	RDBFileContent []byte
 }
@@ -67,6 +78,8 @@ func ReplicateSet(key, value string) {
 	}
 }
 
+var isWorker bool = false
+
 func Dispatcher(conn net.Conn, master bool) {
 
 	buff := make([]byte, 1024)
@@ -74,7 +87,7 @@ func Dispatcher(conn net.Conn, master bool) {
 	ExpriryTime := make(map[string]int)
 
 	response := []byte("+PONG\r\n")
-	store := make(map[string]string)
+	// store := make(map[string]string)
 	for {
 
 		n, err := conn.Read(buff)
@@ -116,6 +129,7 @@ func Dispatcher(conn net.Conn, master bool) {
 			//get
 			key := tokens[4]
 			fmt.Printf("GET ==> %s\n", tokens[4])
+			fmt.Println(store[tokens[4]])
 			if val, ok := ExpriryTime[key]; ok {
 
 				if time.Since(EntryTime[key]).Milliseconds() >= int64(val) {
@@ -168,6 +182,9 @@ func Dispatcher(conn net.Conn, master bool) {
 			//So whenever we send a PSYNC to a worker, we append that conn object associated
 			//with that worker in this array so that we know which conn object belongs to which worker
 			//I'm feeling like GOD
+
+			replConf.workerLock.Lock()
+			defer replConf.workerLock.Unlock()
 			replConf.workers = append(replConf.workers, conn)
 
 			response = []byte(fmt.Sprintf("$%d\r\n%s", len(decode), decode))
@@ -190,19 +207,18 @@ func Dispatcher(conn net.Conn, master bool) {
 	}
 }
 
-func sendPing(masterAddr, masterPort string) {
+func sendPing(masterAddr, masterPort string) net.Conn {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", masterAddr, masterPort))
 
 	if err != nil {
 		fmt.Printf("Error while creating connection object %v\n", err)
 	}
 
-	defer conn.Close()
+	// defer conn.Close()
 	buff := make([]byte, 1024)
 
 	if _, err := conn.Write([]byte("*1\r\n$4\r\nping\r\n")); err != nil {
 		log.Println("Error sending PING command to", masterAddr, ":", err)
-		return
 	}
 	if _, err = conn.Read(buff); err != nil {
 		log.Fatalln("Not receiving response from master node")
@@ -210,7 +226,6 @@ func sendPing(masterAddr, masterPort string) {
 
 	if _, err = conn.Write([]byte("*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$4\r\n6380\r\n")); err != nil {
 		log.Fatalln("First Message not sent : ", err)
-		return
 	}
 
 	if _, err = conn.Write([]byte("*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n")); err != nil {
@@ -236,17 +251,147 @@ func sendPing(masterAddr, masterPort string) {
 		os.Exit(1)
 	}
 
-	_, err = conn.Read(buff)
+	n, err = conn.Read(buff)
 	if err != nil {
 		log.Fatalln("Error while reading FULLRESYNC", err)
 		os.Exit(1)
+	}
+	fmt.Printf("Ack - PSYNC from Master Node : %s\n", string(buff[:n]))
+
+	return conn
+}
+
+func write(c net.Conn, reply []byte) error {
+	_, err := c.Write(reply)
+	if err != nil {
+		fmt.Println("Error writing:", err.Error())
+	}
+	return err
+}
+
+func handleRequest(conn net.Conn, b []byte) error {
+	commands := strings.Split(string(b), "\r\n")
+
+	if len(commands) == 0 {
+		conn.Write([]byte("+Empty Command \r\n"))
+	}
+
+	if len(commands) >= 1 {
+		_, err := strconv.Atoi(commands[1][1:])
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+	}
+
+	// cmd := strings.ToLower(commands[2])
+	fmt.Println("=======")
+	fmt.Println(commands)
+	fmt.Println("=======")
+	command := strings.ToLower(commands[2])
+
+	switch command {
+	case "ping":
+		{
+			return write(conn, toSimpleString("PONG"))
+		}
+	case "echo":
+		{
+			return write(conn, toBulkString(commands[4]))
+		}
+	case "replyconf":
+		{
+			return write(conn, toSimpleString("OK"))
+		}
+	case "psync":
+		{
+			response := []byte("+FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0\r\n")
+			_, err := conn.Write(response)
+			if err != nil {
+				fmt.Printf("Error in writing response : %v\n", err)
+				return err
+
+			}
+
+			decode, err := base64.StdEncoding.DecodeString(RDBContent)
+			if err != nil {
+				log.Fatalln("Error while converting: ", err)
+			}
+
+			replConf.workerLock.Lock()
+			defer replConf.workerLock.Unlock()
+			replConf.workers = append(replConf.workers, conn)
+
+			response = []byte(fmt.Sprintf("$%d\r\n%s", len(decode), decode))
+			_, err = conn.Write(response)
+			if err != nil {
+				log.Fatalf("Error in writing response : %v\n", err)
+				return err
+			}
+		}
+	case "set":
+		{
+			key := commands[4]
+			value := commands[6]
+			fmt.Printf("SET ==> %s\n", commands[4])
+
+			response := []byte("+OK\r\n")
+			store[key] = value
+			if isWorker {
+				ReplicateSet(key, value)
+			}
+			_, err := conn.Write(response)
+			if err != nil {
+				fmt.Printf("Error in writing response : %v\n", err)
+				break
+			}
+			fmt.Println(store)
+		}
+	case "get":
+		{
+			response := make([]byte, 1024)
+			if val, ok := store[commands[4]]; !ok {
+				response = []byte("$-1\r\n")
+			} else {
+				response = []byte(fmt.Sprintf("$%d\r\n%s\r\n", len(val), val))
+			}
+
+			_, err := conn.Write(response)
+			if err != nil {
+				fmt.Printf("Error in writing response : %v\n", err)
+				break
+			}
+		}
+	}
+
+	return nil
+
+}
+
+func handleConnectionToMaster(conn net.Conn) {
+	defer conn.Close()
+
+	for {
+		buffCmds := make([]byte, 5000)
+		_, err := conn.Read(buffCmds)
+		if err != nil {
+			fmt.Printf("Error while receiving the commands : %v\n", err)
+			break
+		}
+
+		arrayCmds := bytes.Split(buffCmds, []byte{'*'})[1:]
+		for _, arr := range arrayCmds {
+			arr = append([]byte("*"), arr...)
+			handleRequest(conn, arr)
+		}
+		// fmt.Printf("The commands : %v\n", bytes.Split(buffCmds, []byte{'*'})[1:])
+
 	}
 
 }
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here !")
+	fmt.Println("Logs from your program will appear here!")
 
 	args := os.Args
 	fmt.Println(args)
@@ -258,7 +403,10 @@ func main() {
 
 	master := true
 	if len(args) > 3 && args[3] == "--replicaof" {
-		sendPing(args[4], args[5])
+		masterConn := sendPing(args[4], args[5])
+		isWorker = true
+		defer masterConn.Close()
+		go handleConnectionToMaster(masterConn)
 		master = false
 	}
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", port))
