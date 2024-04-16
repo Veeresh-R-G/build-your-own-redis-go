@@ -87,7 +87,7 @@ func Dispatcher(conn net.Conn, master bool) {
 	ExpriryTime := make(map[string]int)
 
 	response := []byte("+PONG\r\n")
-	// store := make(map[string]string)
+	// store := make(map[string]string )
 	for {
 
 		n, err := conn.Read(buff)
@@ -163,7 +163,14 @@ func Dispatcher(conn net.Conn, master bool) {
 				response = []byte("$10\r\nrole:slave\r\n")
 			}
 		} else if cmd == "replconf" {
-			fmt.Println("REPLCONF")
+			fmt.Println("REPLCONF hola hola")
+			fmt.Println("Printing Tokens : ", tokens)
+			if len(tokens) >= 5 && tokens[4] == "GETACK" {
+				_, err := conn.Write(toArray([]string{"REPLCONF", "ACK", "0"}))
+				if err != nil {
+					fmt.Println("Error in GETACK : ", err)
+				}
+			}
 			response = []byte("+OK\r\n")
 		} else if cmd == "psync" {
 			fmt.Println("PSYNC")
@@ -288,6 +295,7 @@ func handleRequest(conn net.Conn, b []byte) error {
 	fmt.Println(commands)
 	fmt.Println("=======")
 	command := strings.ToLower(commands[2])
+	fmt.Println("Here in Handle Request")
 
 	switch command {
 	case "ping":
@@ -298,8 +306,11 @@ func handleRequest(conn net.Conn, b []byte) error {
 		{
 			return write(conn, toBulkString(commands[4]))
 		}
-	case "replyconf":
+	case "replconf":
 		{
+			if commands[4] == "GETACK" {
+				return write(conn, toArray([]string{"REPLCONF", "ACK", "0"}))
+			}
 			return write(conn, toSimpleString("OK"))
 		}
 	case "psync":
@@ -380,6 +391,10 @@ func handleConnectionToMaster(conn net.Conn) {
 
 		arrayCmds := bytes.Split(buffCmds, []byte{'*'})[1:]
 		for _, arr := range arrayCmds {
+			arr = bytes.Trim(arr, "\x00")
+			if len(arr) == 0 {
+				return
+			}
 			arr = append([]byte("*"), arr...)
 			handleRequest(conn, arr)
 		}
