@@ -65,7 +65,16 @@
 2. Forgot to close the connection object in the previous stage, fixed it here.
 > Go is actually so cool, became a bigger fan of go routines
 
+### Stage - 13 Command Processing
+1. Pushed the commands from the master node to the worker nodes
+2. Took me 4 days
+
+### Stage - 14 ACKs with no commands
+1. Replied for REPLCONF GETACK command from the worker node to the master node
+
+
+
 #### Pending tasks
-1. Code Refactoring
-2. Use RW.mutex on global slice storing the worker node's connection object
+- [ ] Code Refactoring
+- [x] Use RW.mutex on global slice storing the worker node's connection object
 
